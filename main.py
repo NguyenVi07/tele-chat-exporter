@@ -4,69 +4,86 @@ import csv
 import os
 from telethon.sync import TelegramClient
 from telethon.utils import get_display_name
+from dotenv import load_dotenv
 
-print("Đang khởi động tool nha Vỹ...")
+# Load environment variables
+load_dotenv()
 
-api_id = 31406154
-api_hash = '3bf8fd8df537918ef78ce3a3d0705fb2'
+print("Starting Tele-Chat-Exporter...")
 
-print("Đang kết nối vào Telegram...")
+# Get credentials from .env
+api_id = os.getenv('API_ID')
+api_hash = os.getenv('API_HASH')
+
+if not api_id or not api_hash:
+    print("\n[ERROR] API_ID or API_HASH not found in .env file.")
+    print("Please create a .env file with your credentials.")
+    sys.exit()
+
+try:
+    api_id = int(api_id)
+except ValueError:
+    print("\n[ERROR] API_ID must be a number.")
+    sys.exit()
+
+print("Connecting to Telegram...")
 client = TelegramClient('my_session', api_id, api_hash)
 client.start()
 
-print("\n--- Đang tải danh sách Chat của ông... ---")
+print("\n--- Fetching your Chat list... ---")
 dialogs = client.get_dialogs()
 
 for i, d in enumerate(dialogs):
     print(f"{i}: {d.name} (ID: {d.id})")
 
-index_str = input("\nNhập số thứ tự của Group muốn lấy: ")
+index_str = input("\nEnter the number of the chat you want to export: ")
 try:
     index = int(index_str)
     target_group = dialogs[index]
 except (ValueError, IndexError):
-    print("Số ông nhập không đúng rồi, chạy lại nhé!")
+    print("Invalid number. Please run the tool again.")
     sys.exit()
 
-# 1. Chọn định dạng xuất
-print("\nChọn định dạng xuất:")
-print("1. TXT (Dễ đọc nhất cho NVDA)")
-print("2. JSON (Dữ liệu cho lập trình)")
-print("3. CSV (Mở bằng Excel)")
-fmt_choice = input("Nhập số (1, 2 hoặc 3): ").strip()
+# 1. Select Format
+print("\nSelect export format:")
+print("1. TXT (Best for screen readers)")
+print("2. JSON (Raw data for developers)")
+print("3. CSV (Excel compatible)")
+fmt_choice = input("Enter number (1, 2, or 3): ").strip()
 
-# 2. Chọn cách hiển thị Tên (Dùng chung)
-print("\nChọn cách hiển thị tên người gửi:")
-print("1. Chỉ Tên")
-print("2. Chỉ ID")
-print("3. Cả hai (Tên [ID])")
-name_choice = input("Nhập số (1, 2 hoặc 3): ").strip()
+# 2. Select Name Display
+print("\nSelect sender name format:")
+print("1. Name only (e.g., John Doe)")
+print("2. ID only (e.g., 123456789)")
+print("3. Both (e.g., John Doe [123456789])")
+name_choice = input("Enter number (1, 2, or 3): ").strip()
 
-# 3. Các tùy chọn nâng cao theo định dạng (Dùng Y/N)
+# 3. Advanced Options based on Format
 inc_time_txt = False
 inc_time_jc = False
 inc_id_jc = False
 
 if fmt_choice == '1':
-    # Hỏi cho TXT
-    ans_time = input("\nÔng có muốn kèm theo Thời gian không? (y/n): ").strip().lower()
+    # Ask for TXT
+    ans_time = input("\nInclude timestamp in TXT? (y/n): ").strip().lower()
     if ans_time == 'y':
         inc_time_txt = True
 else:
-    # Hỏi cho JSON và CSV
-    ans_time = input("\nCó giữ trường Thời gian (Date/Time) không? (y/n): ").strip().lower()
+    # Ask for JSON/CSV
+    ans_time = input("\nInclude 'time' field? (y/n): ").strip().lower()
     if ans_time == 'y':
         inc_time_jc = True
         
-    ans_id = input("Có giữ trường ID người gửi (Sender ID) riêng không? (y/n): ").strip().lower()
+    ans_id = input("Include separate 'sender_id' field? (y/n): ").strip().lower()
     if ans_id == 'y':
         inc_id_jc = True
 
-print(f"\nĐang bắt đầu lấy tin nhắn từ: {target_group.name}...")
+print(f"\nStarting export for: {target_group.name}...")
 
 messages_data = []
 count = 0
 
+# Fetch messages
 for message in client.iter_messages(target_group):
     if not message.text:
         continue
@@ -75,7 +92,7 @@ for message in client.iter_messages(target_group):
     name = get_display_name(sender) if sender else "Unknown"
     sender_id = str(message.sender_id) if message.sender_id else "N/A"
 
-    # Xử lý tên hiển thị
+    # Handle display name
     if name_choice == '1':
         display_name = name
     elif name_choice == '2':
@@ -84,18 +101,19 @@ for message in client.iter_messages(target_group):
         display_name = f"{name} [{sender_id}]"
 
     timestamp = str(message.date)
+    # Replace newlines with spaces for cleaner one-line reading
     clean_text = message.text.replace('\n', ' ')
 
-    # Xây dựng dữ liệu tùy theo định dạng
+    # Build data dictionary
     if fmt_choice == '1':
-        # Dữ liệu cho TXT
+        # TXT structure
         data_dict = {
             "sender": display_name,
             "message": clean_text,
             "time": timestamp
         }
     else:
-        # Dữ liệu cho JSON / CSV (động theo Y/N)
+        # JSON/CSV structure
         data_dict = {"sender": display_name, "message": clean_text}
         if inc_id_jc:
             data_dict["sender_id"] = sender_id
@@ -106,40 +124,62 @@ for message in client.iter_messages(target_group):
 
     count += 1
     if count % 100 == 0:
-        print(f"Đã lấy được {count} tin nhắn...")
+        print(f"Fetched {count} messages...")
 
 if not messages_data:
-    print("Không tìm thấy tin nhắn nào cả!")
+    print("No text messages found in this chat.")
     sys.exit()
 
-# Đảo ngược để tin cũ ở trên, mới ở dưới
+# Reverse to chronological order (oldest first)
 messages_data.reverse()
 
-# Tạo tên file an toàn
-safe_name = "".join([c for c in target_group.name if c.isalnum() or c in (' ', '_')]).strip()
+# --- FOLDER CREATION LOGIC ---
 
-# 4. Lưu file dựa trên lựa chọn
+# 1. Create safe name for Folder and File
+# Allow alphanumeric, spaces, underscores, and hyphens
+safe_name = "".join([c for c in target_group.name if c.isalnum() or c in (' ', '_', '-')]).strip()
+
+# Fallback if name becomes empty (e.g. only emojis)
+if not safe_name:
+    safe_name = f"chat_{target_group.id}"
+
+# 2. Define Paths
+base_export_dir = "export"
+# Structure: export/ChatName/
+chat_export_dir = os.path.join(base_export_dir, safe_name)
+
+# 3. Create Directories (if they don't exist)
+os.makedirs(chat_export_dir, exist_ok=True)
+
+# 4. Define full file path
 if fmt_choice == '1':
-    file_path = f"{safe_name}.txt"
+    filename = f"{safe_name}.txt"
+    file_path = os.path.join(chat_export_dir, filename)
+    
     with open(file_path, "w", encoding="utf-8") as f:
         for m in messages_data:
             if inc_time_txt:
-                f.write(f"{m['sender']}: {m['message']} : {m['time']}\n")
+                f.write(f"[{m['time']}] {m['sender']}: {m['message']}\n")
             else:
                 f.write(f"{m['sender']}: {m['message']}\n")
 
 elif fmt_choice == '2':
-    file_path = f"{safe_name}.json"
+    filename = f"{safe_name}.json"
+    file_path = os.path.join(chat_export_dir, filename)
+    
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(messages_data, f, ensure_ascii=False, indent=4)
 
 elif fmt_choice == '3':
-    file_path = f"{safe_name}.csv"
+    filename = f"{safe_name}.csv"
+    file_path = os.path.join(chat_export_dir, filename)
+    
     keys = messages_data[0].keys()
     with open(file_path, "w", encoding="utf-8-sig", newline='') as f:
         dict_writer = csv.DictWriter(f, fieldnames=keys)
         dict_writer.writeheader()
         dict_writer.writerows(messages_data)
 
-print(f"\n--- XONG RỒI VỸ ƠI! ---")
-print(f"File lưu tại: {os.path.abspath(file_path)}")
+print(f"\n--- SUCCESS! ---")
+print(f"Directory created: {os.path.abspath(chat_export_dir)}")
+print(f"File saved to: {os.path.abspath(file_path)}")
