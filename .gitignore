@@ -1,1 +1,13 @@
 .env
+*.session
+*.session-journal
+export/
+*.txt
+*.json
+*.csv
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.vscode/
