@@ -1,0 +1,9 @@
+[project]
+name = "tele-chat-exporter"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "telethon>=1.42.0",
+]
