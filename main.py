@@ -46,9 +46,9 @@ except (ValueError, IndexError):
 
 # 1. Select Format
 print("\nSelect export format:")
-print("1. TXT (Best for screen readers)")
-print("2. JSON (Raw data for developers)")
-print("3. CSV (Excel compatible)")
+print("1. TXT")
+print("2. JSON")
+print("3. CSV")
 fmt_choice = input("Enter number (1, 2, or 3): ").strip()
 
 # 2. Select Name Display
